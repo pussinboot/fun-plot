@@ -4,9 +4,13 @@ class FunPlot():
 	def __init__(self,root):
 		self.canvas = tk.Canvas(root,width=200,height=200,bg="black")
 		self.root = root
-		self.create_circle(100,100,10,fill="white")
 		self.canvas.pack()
 		self._drag_data = {"x": 0, "y": 0, "item": None}
+		self.circles = []
+		self.lines = {}
+		self.lines_to_dots = {}
+		self.radius = 10
+		self.create_circle(100,100,self.radius,fill="white")
 
 		self.canvas.tag_bind("circle","<ButtonPress-1>",self.OnCirclePress)
 		self.canvas.tag_bind("circle", "<ButtonRelease-1>", self.OnCircleRelease)
@@ -15,7 +19,27 @@ class FunPlot():
 		self.canvas.bind("<Shift-3>",self.quit)
 
 	def create_circle(self,x,y,r,**kwargs):
-		return self.canvas.create_oval(x-r,y-r,x+r,y+r,tags="circle",**kwargs)
+		new_circle = self.canvas.create_oval(x-r,y-r,x+r,y+r,tags="circle",**kwargs)
+		self.circles.append(new_circle)
+		self.lines[str(new_circle)] = []
+
+	def circle_center(self,circle):
+		tor = self.canvas.coords(circle)
+		return (tor[0] + self.radius,tor[1] + self.radius)
+
+	def connect_dots(self,dot_1,dot_2):
+		coords_1 = self.circle_center(dot_1)
+		coords_2 = self.circle_center(dot_2)
+		new_line = self.canvas.create_line(coords_1[0],coords_1[1],coords_2[0],coords_2[1],fill='gray',width=5)
+		self.lines[str(dot_1)].append(new_line)
+		self.lines[str(dot_2)].append(new_line)
+		self.lines_to_dots[str(new_line)] = [str(dot_1),str(dot_2)]
+
+	def move_line(self,line):
+		dots = self.lines_to_dots[str(line)]
+		coords_1 = self.circle_center(dots[0])
+		coords_2 = self.circle_center(dots[1])
+		self.canvas.coords(line,coords_1[0],coords_1[1],coords_2[0],coords_2[1])
 
 	def OnCirclePress(self, event):
 		'''Begin drag of an object'''
@@ -28,9 +52,10 @@ class FunPlot():
 
 	def OnCircleRelease(self, event):
 		'''End drag of an object'''
-		# reset the drag information
-
 		self.canvas.itemconfig(self._drag_data["item"], fill="white")
+		for line in self.lines[str(self._drag_data["item"])]:
+			self.move_line(line)
+		# reset the drag information
 		self._drag_data["item"] = None
 		self._drag_data["x"] = 0
 		self._drag_data["y"] = 0
@@ -47,10 +72,13 @@ class FunPlot():
 		# record the new position
 		self._drag_data["x"] = event.x
 		self._drag_data["y"] = event.y	
+		for line in self.lines[str(self._drag_data["item"])]:
+			self.move_line(line)
 	
 	def OnRightClick(self,event):
 		''' make new object '''
 		self.create_circle(event.x,event.y,10,fill='red')
+		self.connect_dots(self.circles[-2],self.circles[-1])
 
 	def resize_canvas(self,event):
 		# case where x_root or y_root is less than 0
